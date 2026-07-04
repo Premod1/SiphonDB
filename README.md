@@ -87,6 +87,15 @@ To bundle SiphonDB into a standalone platform-specific installer (executable):
 npm run tauri build
 ```
 
+### 🤖 CI/CD & Automated Releases
+
+This project is configured with GitHub Actions to automate cross-platform releases. When you push to the `main` branch or push a tag starting with `v` (e.g. `v0.1.0`):
+- **Windows**: Builds standalone executables and MSI installers.
+- **macOS**: Compiles universal binaries (Intel + Apple Silicon target).
+- **Linux (Ubuntu)**: Packages as AppImage and `.deb` packages.
+
+All compiled assets are automatically uploaded to a new **Draft Release** on GitHub.
+
 ---
 
 ## 🔒 Security Note
