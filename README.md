@@ -4,6 +4,33 @@
 
 ---
 
+## 🖥️ Screenshots
+
+<table width="100%">
+  <tr>
+    <td width="50%" valign="top">
+      <p align="center"><b>Data Preview & Explorer</b></p>
+      <img src="screenshots/explorer_data_preview.png" alt="Data Preview & Explorer" width="100%"/>
+    </td>
+    <td width="50%" valign="top">
+      <p align="center"><b>Database Driver Selection</b></p>
+      <img src="screenshots/database_selection.png" alt="Database Driver Selection" width="100%"/>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <p align="center"><b>Connection Settings & SSH Tunneling</b></p>
+      <img src="screenshots/connection_settings.png" alt="Connection Settings" width="100%"/>
+    </td>
+    <td width="50%" valign="top">
+      <p align="center"><b>SQL Editor & Query Results</b></p>
+      <img src="screenshots/sql_editor.png" alt="SQL Editor" width="100%"/>
+    </td>
+  </tr>
+</table>
+
+---
+
 ## ✨ Features
 
 - **🔋 Multi-Engine Support**: Seamlessly connect to and query **PostgreSQL**, **MySQL / MariaDB**, and local **SQLite** database files.
