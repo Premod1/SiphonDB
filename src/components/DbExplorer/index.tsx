@@ -7,6 +7,7 @@ import TableSidebar from "./TableSidebar";
 import DataGrid from "./DataGrid";
 import SqlEditorTab from "./SqlEditorTab";
 import RowEditorModal from "./RowEditorModal";
+import ExportModal from "./ExportModal";
 import { ShieldCheck, ChevronLeft, ChevronRight, AlertCircle, RefreshCw } from "lucide-react";
 
 interface DbExplorerProps {
@@ -17,6 +18,8 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
   const [activeDb, setActiveDb] = useState<Database | null>(null);
   const dbRef = useRef<Database | null>(null);
   const sshLocalPortRef = useRef<number | null>(null);
+  
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const [databases, setDatabases] = useState<string[]>([]);
   const [activeDbName, setActiveDbName] = useState<string>("");
@@ -820,6 +823,7 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
         setSelectedTable={setSelectedTable}
         connectToDatabase={connectToDatabase}
         handleCreateDatabase={handleCreateDatabase}
+        onExportClick={() => setIsExportModalOpen(true)}
       />
 
       {/* Workspace Area */}
@@ -938,6 +942,17 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
         rowEditorNulls={rowEditorNulls}
         setRowEditorNulls={setRowEditorNulls}
         handleSaveRow={handleSaveRow}
+      />
+
+      {/* Export Database Modal Dialog */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        connection={connection}
+        tables={tables}
+        activeDbName={activeDbName}
+        getOrLoadDb={getOrLoadDb}
+        sshLocalPort={sshLocalPortRef.current}
       />
     </div>
   );
