@@ -1,4 +1,4 @@
-import { Table, RefreshCw, Search, ChevronDown } from "lucide-react";
+import { Table, RefreshCw, Search, ChevronDown, Download } from "lucide-react";
 import { DbConnection } from "../../types/connection";
 
 interface TableSidebarProps {
@@ -14,6 +14,7 @@ interface TableSidebarProps {
   setSelectedTable: (table: string) => void;
   connectToDatabase: (dbName: string) => void;
   handleCreateDatabase: () => void;
+  onExportClick: () => void;
 }
 
 export default function TableSidebar({
@@ -29,6 +30,7 @@ export default function TableSidebar({
   setSelectedTable,
   connectToDatabase,
   handleCreateDatabase,
+  onExportClick,
 }: TableSidebarProps) {
   return (
     <div
@@ -79,14 +81,24 @@ export default function TableSidebar({
             <Table className="w-3.5 h-3.5 text-indigo-400" />
             Tables
           </h3>
-          <button
-            onClick={() => connectToDatabase(activeDbName)}
-            disabled={isConnecting}
-            className="p-1 rounded text-gray-500 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40 cursor-pointer"
-            title="Refresh tables"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isConnecting ? "animate-spin" : ""}`} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onExportClick}
+              disabled={isConnecting || filteredTables.length === 0}
+              className="p-1 rounded text-gray-500 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40 cursor-pointer"
+              title="Export database"
+            >
+              <Download className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => connectToDatabase(activeDbName)}
+              disabled={isConnecting}
+              className="p-1 rounded text-gray-500 hover:text-white hover:bg-white/5 transition-colors disabled:opacity-40 cursor-pointer"
+              title="Refresh tables"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isConnecting ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         </div>
 
         <div className="relative">
