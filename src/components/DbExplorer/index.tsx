@@ -6,6 +6,7 @@ import { getConnectionUri, quote } from "../../utils/db";
 import TableSidebar from "./TableSidebar";
 import DataGrid from "./DataGrid";
 import SqlEditorTab from "./SqlEditorTab";
+import ErdTab from "./ErdTab";
 import RowEditorModal from "./RowEditorModal";
 import ExportModal from "./ExportModal";
 import { ShieldCheck, ChevronLeft, ChevronRight, AlertCircle, RefreshCw } from "lucide-react";
@@ -53,7 +54,7 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
   const [rowEditorData, setRowEditorData] = useState<Record<string, string>>({});
   const [rowEditorNulls, setRowEditorNulls] = useState<Record<string, boolean>>({});
 
-  const [activeTab, setActiveTab] = useState<"data" | "query">("data");
+  const [activeTab, setActiveTab] = useState<"data" | "query" | "diagram">("data");
   
   // Custom Query
   const [sqlQuery, setSqlQuery] = useState("");
@@ -1027,6 +1028,16 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
               >
                 SQL Editor
               </button>
+              <button
+                onClick={() => setActiveTab("diagram")}
+                className={`py-3.5 px-1 border-b-2 font-medium text-xs transition-all ${
+                  activeTab === "diagram"
+                    ? "border-indigo-500 text-indigo-400"
+                    : "border-transparent text-gray-400 hover:text-white"
+                }`}
+              >
+                Database Diagram
+              </button>
             </div>
           </div>
           <div className="flex items-center gap-2 text-[10px] text-gray-500 font-mono">
@@ -1105,6 +1116,17 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
               clearHistory={clearHistory}
               saveQueryItem={saveQueryItem}
               deleteSavedQueryItem={deleteSavedQueryItem}
+            />
+          )}
+
+          {/* PANEL 3: Database Diagram */}
+          {activeTab === "diagram" && (
+            <ErdTab
+              connection={connection}
+              activeDb={activeDb}
+              tables={tables}
+              onTableSelect={setSelectedTable}
+              setActiveTab={setActiveTab}
             />
           )}
         </div>
