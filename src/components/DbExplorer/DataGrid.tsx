@@ -22,6 +22,12 @@ interface DataGridProps {
   handleEditRowClickExplicit: (idx: number) => void;
   handlePageChange: (newPage: number) => void;
   handlePageInputSubmit: () => void;
+  columnFilters: Record<string, string>;
+  sortColumn: string | null;
+  sortDirection: "ASC" | "DESC" | null;
+  handleSort: (col: string) => void;
+  handleFilterChange: (col: string, val: string) => void;
+  handleClearFilters: () => void;
 }
 
 export default function DataGrid({
@@ -46,7 +52,15 @@ export default function DataGrid({
   handleEditRowClickExplicit,
   handlePageChange,
   handlePageInputSubmit,
+  columnFilters,
+  sortColumn,
+  sortDirection,
+  handleSort,
+  handleFilterChange,
+  handleClearFilters,
 }: DataGridProps) {
+  const hasActiveFilters = Object.keys(columnFilters).length > 0;
+
   return (
     <div className="flex-1 flex flex-col border border-white/5 rounded-xl bg-gray-900/10 overflow-hidden">
       {/* Row Actions Toolbar */}
@@ -79,6 +93,15 @@ export default function DataGrid({
           >
             {selectedRowIndexes.size > 1 ? `Delete Selected (${selectedRowIndexes.size})` : "Delete Selected"}
           </button>
+
+          {hasActiveFilters && (
+            <button
+              onClick={handleClearFilters}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-yellow-600/10 hover:bg-yellow-600/20 border border-yellow-500/20 hover:border-yellow-500/40 text-yellow-450 rounded-lg font-semibold transition-all cursor-pointer text-[11px]"
+            >
+              Clear Filters
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -103,7 +126,7 @@ export default function DataGrid({
             <DbIcon className="w-8 h-8 text-gray-600 mb-2" />
             <p className="text-xs text-gray-500">No table selected</p>
           </div>
-        ) : rows.length === 0 ? (
+        ) : rows.length === 0 && !hasActiveFilters ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-4">
             <Table className="w-8 h-8 text-gray-600 mb-2" />
             <p className="text-xs text-gray-500 font-semibold mb-1">Table is empty</p>
@@ -111,9 +134,9 @@ export default function DataGrid({
           </div>
         ) : (
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="sticky top-0 bg-gray-950 z-1 border-b border-white/5">
+            <thead className="sticky top-0 bg-gray-950 z-2 border-b border-white/5">
               <tr>
-                <th className="px-4 py-3 border-r border-white/5 w-12 text-center select-none">
+                <th className="px-4 py-3 border-r border-white/5 w-12 text-center select-none bg-gray-950">
                   <input
                     type="checkbox"
                     checked={rows.length > 0 && selectedRowIndexes.size === rows.length}
@@ -123,67 +146,104 @@ export default function DataGrid({
                 </th>
                 {columns.map((col) => {
                   const isPk = primaryKeys.includes(col);
+                  const isSorted = sortColumn === col;
                   return (
-                    <th key={col} className="px-4 py-3 font-semibold text-gray-400 border-r border-white/5 whitespace-nowrap">
-                      <span className="flex items-center gap-1">
+                    <th
+                      key={col}
+                      onClick={() => handleSort(col)}
+                      className="px-4 py-3 font-semibold text-gray-400 border-r border-white/5 whitespace-nowrap cursor-pointer hover:bg-white/[0.02] hover:text-white transition-all select-none bg-gray-950"
+                    >
+                      <span className="flex items-center gap-1.5">
                         {isPk && <Key className="w-3 h-3 text-yellow-500 shrink-0" />}
                         {col}
+                        <span className="text-[10px] text-indigo-400 font-mono">
+                          {isSorted ? (sortDirection === "ASC" ? " ▲" : " ▼") : " ⇅"}
+                        </span>
                       </span>
+                    </th>
+                  );
+                })}
+              </tr>
+              {/* Inline Filters Row */}
+              <tr className="border-b border-white/5 bg-gray-950">
+                <th className="px-4 py-2 border-r border-white/5 text-center bg-gray-950">
+                  {/* Empty cell for checkbox alignment */}
+                </th>
+                {columns.map((col) => {
+                  const filterVal = columnFilters[col] || "";
+                  return (
+                    <th key={col + "-filter"} className="px-2.5 py-2 border-r border-white/5 bg-gray-950">
+                      <input
+                        type="text"
+                        placeholder={`Filter ${col}...`}
+                        value={filterVal}
+                        onChange={(e) => handleFilterChange(col, e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full px-3 py-1.5 bg-gray-900 border border-white/10 hover:border-white/20 focus:border-indigo-500 text-xs text-gray-200 font-mono rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-gray-600"
+                      />
                     </th>
                   );
                 })}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {rows.map((row, idx) => {
-                const isChecked = selectedRowIndexes.has(idx);
-                return (
-                  <tr
-                    key={idx}
-                    onClick={() => handleToggleRowSelect(idx)}
-                    onDoubleClick={() => {
-                      handleEditRowClickExplicit(idx);
-                    }}
-                    className={`transition-colors cursor-pointer ${
-                      isChecked
-                        ? "bg-indigo-600/10 text-indigo-300 border-y border-indigo-500/20"
-                        : "hover:bg-white/[0.01]"
-                    }`}
-                  >
-                    <td className="px-4 py-2.5 border-r border-white/5 w-12 text-center" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => handleToggleRowSelect(idx)}
-                        className="w-3.5 h-3.5 accent-indigo-500 bg-gray-950 border-white/10 rounded cursor-pointer"
-                      />
-                    </td>
-                    {columns.map((col) => (
-                      <td key={col} className="px-4 py-2.5 font-mono text-[11px] border-r border-white/5 whitespace-nowrap max-w-[240px] truncate">
-                        {row[col] === null ? (
-                          <span className="text-gray-700 italic">null</span>
-                        ) : typeof row[col] === "boolean" ? (
-                          row[col] ? "true" : "false"
-                        ) : (
-                          String(row[col])
-                        )}
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length + 1} className="px-4 py-10 text-center text-xs text-gray-500 italic">
+                    No records match active filters.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row, idx) => {
+                  const isChecked = selectedRowIndexes.has(idx);
+                  return (
+                    <tr
+                      key={idx}
+                      onClick={() => handleToggleRowSelect(idx)}
+                      onDoubleClick={() => {
+                        handleEditRowClickExplicit(idx);
+                      }}
+                      className={`transition-colors cursor-pointer ${
+                        isChecked
+                          ? "bg-indigo-600/10 text-indigo-300 border-y border-indigo-500/20"
+                          : "hover:bg-white/[0.01]"
+                      }`}
+                    >
+                      <td className="px-4 py-2.5 border-r border-white/5 w-12 text-center" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleRowSelect(idx)}
+                          className="w-3.5 h-3.5 accent-indigo-500 bg-gray-950 border-white/10 rounded cursor-pointer"
+                        />
                       </td>
-                    ))}
-                  </tr>
-                );
-              })}
+                      {columns.map((col) => (
+                        <td key={col} className="px-4 py-2.5 font-mono text-[11px] border-r border-white/5 whitespace-nowrap max-w-[240px] truncate">
+                          {row[col] === null ? (
+                            <span className="text-gray-700 italic">null</span>
+                          ) : typeof row[col] === "boolean" ? (
+                            row[col] ? "true" : "false"
+                          ) : (
+                            String(row[col])
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         )}
       </div>
 
       {/* Pagination Controls */}
-      {selectedTable && rows.length > 0 && (
+      {selectedTable && (rows.length > 0 || hasActiveFilters) && (
         <div className="px-4 py-3 border-t border-white/5 bg-gray-950/40 flex items-center justify-between text-xs text-gray-400 shrink-0">
           <div className="flex items-center gap-1">
             <span>Showing</span>
             <span className="font-semibold text-white">
-              {Math.min(totalRows, (page - 1) * pageSize + 1)} - {Math.min(totalRows, page * pageSize)}
+              {totalRows === 0 ? 0 : Math.min(totalRows, (page - 1) * pageSize + 1)} - {Math.min(totalRows, page * pageSize)}
             </span>
             <span>of</span>
             <span className="font-semibold text-white">{totalRows}</span>
