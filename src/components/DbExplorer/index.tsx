@@ -6,9 +6,11 @@ import { getConnectionUri, quote } from "../../utils/db";
 import TableSidebar from "./TableSidebar";
 import DataGrid from "./DataGrid";
 import SqlEditorTab from "./SqlEditorTab";
+import ErdTab from "./ErdTab";
 import RowEditorModal from "./RowEditorModal";
 import ExportModal from "./ExportModal";
 import { ShieldCheck, ChevronLeft, ChevronRight, AlertCircle, RefreshCw } from "lucide-react";
+import { useQueryManager } from "../../hooks/useQueryManager";
 
 interface DbExplorerProps {
   connection: DbConnection;
@@ -35,6 +37,11 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
   const [primaryKeys, setPrimaryKeys] = useState<string[]>([]);
   const [selectedRowIndexes, setSelectedRowIndexes] = useState<Set<number>>(new Set());
   
+  // Data Filtering & Sorting
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<"ASC" | "DESC" | null>(null);
+
   // Pagination
   const [page, setPage] = useState(1);
   const [pageSize] = useState(20);
@@ -47,7 +54,7 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
   const [rowEditorData, setRowEditorData] = useState<Record<string, string>>({});
   const [rowEditorNulls, setRowEditorNulls] = useState<Record<string, boolean>>({});
 
-  const [activeTab, setActiveTab] = useState<"data" | "query">("data");
+  const [activeTab, setActiveTab] = useState<"data" | "query" | "diagram">("data");
   
   // Custom Query
   const [sqlQuery, setSqlQuery] = useState("");
@@ -62,6 +69,16 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
   const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [queryError, setQueryError] = useState<string | null>(null);
+  // Query Manager for history and saved templates
+  const {
+    history,
+    savedQueries,
+    addHistoryItem,
+    deleteHistoryItem,
+    clearHistory,
+    saveQueryItem,
+    deleteSavedQueryItem,
+  } = useQueryManager(connection.id, activeDbName);
 
   // Self-healing database connection manager
   const getOrLoadDb = useCallback(async (forceRefresh = false): Promise<Database> => {
@@ -204,19 +221,48 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
   };
 
   // Fetch data for the selected table with self-healing retry
-  const fetchTableData = useCallback(async (tableName: string, targetPage: number) => {
+  const fetchTableData = useCallback(async (
+    tableName: string,
+    targetPage: number,
+    overrideFilters?: Record<string, string>,
+    overrideSortCol?: string | null,
+    overrideSortDir?: "ASC" | "DESC" | null
+  ) => {
     setIsDataLoading(true);
     setError(null);
     try {
       let db = await getOrLoadDb();
+
+      const filters = overrideFilters !== undefined ? overrideFilters : columnFilters;
+      const sortCol = overrideSortCol !== undefined ? overrideSortCol : sortColumn;
+      const sortDir = overrideSortDir !== undefined ? overrideSortDir : sortDirection;
       
       const runFetch = async (activeDbInstance: Database) => {
+        // Build WHERE clause
+        const whereClauses: string[] = [];
+        Object.entries(filters).forEach(([col, val]) => {
+          if (val.trim()) {
+            const quotedCol = quote(col, connection.db_type);
+            const safeVal = val.replace(/'/g, "''");
+            if (connection.db_type === "postgres") {
+              whereClauses.push(`CAST(${quotedCol} AS TEXT) ILIKE '%${safeVal}%'`);
+            } else {
+              // mysql/sqlite
+              whereClauses.push(`CAST(${quotedCol} AS CHAR) LIKE '%${safeVal}%'`);
+            }
+          }
+        });
+        const whereString = whereClauses.length > 0 ? " WHERE " + whereClauses.join(" AND ") : "";
+
+        // Build ORDER BY clause
+        const orderString = sortCol ? ` ORDER BY ${quote(sortCol, connection.db_type)} ${sortDir || "ASC"}` : "";
+
         // 1. Fetch total rows count
         let countQuery = "";
         if (connection.db_type === "postgres") {
-          countQuery = `SELECT COUNT(*) AS count FROM "${tableName}"`;
+          countQuery = `SELECT COUNT(*) AS count FROM "${tableName}"${whereString}`;
         } else {
-          countQuery = `SELECT COUNT(*) AS count FROM \`${tableName}\``;
+          countQuery = `SELECT COUNT(*) AS count FROM \`${tableName}\`${whereString}`;
         }
         const countResult = await activeDbInstance.select<{ count: any }[]>(countQuery);
         const total = Number(countResult[0]?.count || 0);
@@ -253,9 +299,9 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
         let dataQuery = "";
         const offset = (targetPage - 1) * pageSize;
         if (connection.db_type === "postgres") {
-          dataQuery = `SELECT ${selectFields} FROM "${tableName}" LIMIT ${pageSize} OFFSET ${offset}`;
+          dataQuery = `SELECT ${selectFields} FROM "${tableName}"${whereString}${orderString} LIMIT ${pageSize} OFFSET ${offset}`;
         } else {
-          dataQuery = `SELECT ${selectFields} FROM \`${tableName}\` LIMIT ${pageSize} OFFSET ${offset}`;
+          dataQuery = `SELECT ${selectFields} FROM \`${tableName}\`${whereString}${orderString} LIMIT ${pageSize} OFFSET ${offset}`;
         }
         const data = await activeDbInstance.select<any[]>(dataQuery);
         setRows(data);
@@ -276,7 +322,7 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
     } finally {
       setIsDataLoading(false);
     }
-  }, [connection.db_type, pageSize, getOrLoadDb]);
+  }, [connection.db_type, pageSize, getOrLoadDb, columnFilters, sortColumn, sortDirection]);
 
   // Connect & load databases and tables list
   const connectToDatabase = useCallback(async (targetDbName?: string) => {
@@ -482,10 +528,16 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
   // Fetch table data when selected table changes
   useEffect(() => {
     if (selectedTable && activeDb) {
-      fetchTableData(selectedTable, 1);
+      setColumnFilters({});
+      setSortColumn(null);
+      setSortDirection(null);
+      setPage(1);
+      setPageInputVal("1");
+      
+      fetchTableData(selectedTable, 1, {}, null, null);
       setSqlQuery(`SELECT * FROM ${quote(selectedTable, connection.db_type)} LIMIT 20;`);
     }
-  }, [selectedTable, activeDb, fetchTableData, connection.db_type]);
+  }, [selectedTable, activeDb]);
 
   // Sync page state to input box value
   useEffect(() => {
@@ -508,6 +560,71 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
     } else {
       setPageInputVal(String(page)); // Reset
     }
+  };
+
+  // Sort Handler
+  const handleSort = (columnName: string) => {
+    let nextDir: "ASC" | "DESC" | null = "ASC";
+    if (sortColumn === columnName) {
+      if (sortDirection === "ASC") {
+        nextDir = "DESC";
+      } else if (sortDirection === "DESC") {
+        nextDir = null;
+      }
+    }
+    
+    setSortColumn(nextDir ? columnName : null);
+    setSortDirection(nextDir);
+    setPage(1);
+    setPageInputVal("1");
+    setSelectedRowIndexes(new Set());
+    
+    fetchTableData(
+      selectedTable!,
+      1,
+      columnFilters,
+      nextDir ? columnName : null,
+      nextDir
+    );
+  };
+
+  // Filter Change Handler
+  const handleFilterChange = (columnName: string, value: string) => {
+    const nextFilters = { ...columnFilters };
+    if (value.trim()) {
+      nextFilters[columnName] = value;
+    } else {
+      delete nextFilters[columnName];
+    }
+    
+    setColumnFilters(nextFilters);
+    setPage(1);
+    setPageInputVal("1");
+    setSelectedRowIndexes(new Set());
+    
+    fetchTableData(
+      selectedTable!,
+      1,
+      nextFilters,
+      sortColumn,
+      sortDirection
+    );
+  };
+
+  // Clear Filters Handler
+  const handleClearFilters = () => {
+    setColumnFilters({});
+    setPage(1);
+    setPageInputVal("1");
+    setSelectedRowIndexes(new Set());
+    
+    fetchTableData(
+      selectedTable!,
+      1,
+      {},
+      sortColumn,
+      sortDirection
+    );
   };
 
   // Checkbox Selection Helpers
@@ -843,10 +960,12 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
 
       try {
         await runQuery(db);
+        await addHistoryItem(sqlQuery);
       } catch (err) {
         console.warn("Retrying user query due to error:", err);
         db = await getOrLoadDb(true);
         await runQuery(db);
+        await addHistoryItem(sqlQuery);
       }
     } catch (err: any) {
       console.error("Query execution failed:", err);
@@ -909,6 +1028,16 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
               >
                 SQL Editor
               </button>
+              <button
+                onClick={() => setActiveTab("diagram")}
+                className={`py-3.5 px-1 border-b-2 font-medium text-xs transition-all ${
+                  activeTab === "diagram"
+                    ? "border-indigo-500 text-indigo-400"
+                    : "border-transparent text-gray-400 hover:text-white"
+                }`}
+              >
+                Database Diagram
+              </button>
             </div>
           </div>
           <div className="flex items-center gap-2 text-[10px] text-gray-500 font-mono">
@@ -961,6 +1090,12 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
               handleEditRowClickExplicit={handleEditRowClickExplicit}
               handlePageChange={handlePageChange}
               handlePageInputSubmit={handlePageInputSubmit}
+              columnFilters={columnFilters}
+              sortColumn={sortColumn}
+              sortDirection={sortDirection}
+              handleSort={handleSort}
+              handleFilterChange={handleFilterChange}
+              handleClearFilters={handleClearFilters}
             />
           )}
 
@@ -975,6 +1110,23 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
               queryColumns={queryColumns}
               handleRunQuery={handleRunQuery}
               schemaInfo={schemaInfo}
+              history={history}
+              savedQueries={savedQueries}
+              deleteHistoryItem={deleteHistoryItem}
+              clearHistory={clearHistory}
+              saveQueryItem={saveQueryItem}
+              deleteSavedQueryItem={deleteSavedQueryItem}
+            />
+          )}
+
+          {/* PANEL 3: Database Diagram */}
+          {activeTab === "diagram" && (
+            <ErdTab
+              connection={connection}
+              activeDb={activeDb}
+              tables={tables}
+              onTableSelect={setSelectedTable}
+              setActiveTab={setActiveTab}
             />
           )}
         </div>
