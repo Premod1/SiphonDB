@@ -1,4 +1,6 @@
 import { Terminal, Play, AlertCircle, Table } from "lucide-react";
+import CodeMirror from "@uiw/react-codemirror";
+import { sql } from "@codemirror/lang-sql";
 
 interface SqlEditorTabProps {
   sqlQuery: string;
@@ -8,6 +10,7 @@ interface SqlEditorTabProps {
   queryResult: any[] | null;
   queryColumns: string[];
   handleRunQuery: () => void;
+  schemaInfo: Record<string, string[]>;
 }
 
 export default function SqlEditorTab({
@@ -18,6 +21,7 @@ export default function SqlEditorTab({
   queryResult,
   queryColumns,
   handleRunQuery,
+  schemaInfo,
 }: SqlEditorTabProps) {
   return (
     <div className="h-full flex flex-col space-y-4 overflow-hidden">
@@ -37,12 +41,24 @@ export default function SqlEditorTab({
             Run Query
           </button>
         </div>
-        <textarea
-          value={sqlQuery}
-          onChange={(e) => setSqlQuery(e.target.value)}
-          placeholder="SELECT * FROM table_name LIMIT 10;"
-          className="w-full p-4 h-28 bg-gray-900/20 text-gray-200 font-mono text-xs focus:outline-none resize-none"
-        />
+        <div className="w-full bg-gray-950 text-xs font-mono">
+          <CodeMirror
+            value={sqlQuery}
+            height="140px"
+            theme="dark"
+            extensions={[sql({ schema: schemaInfo })]}
+            onChange={(value) => setSqlQuery(value)}
+            placeholder="SELECT * FROM table_name LIMIT 10;"
+            className="w-full focus:outline-none"
+            basicSetup={{
+              lineNumbers: true,
+              foldGutter: false,
+              dropCursor: true,
+              allowMultipleSelections: false,
+              indentOnInput: true,
+            }}
+          />
+        </div>
       </div>
 
       {/* Console Error */}

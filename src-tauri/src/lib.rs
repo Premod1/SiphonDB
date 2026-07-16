@@ -1,9 +1,28 @@
+use tauri::Manager;
+
 mod ssh_tunnel;
+mod encryption;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
+}
+
+#[tauri::command]
+fn encrypt_password(
+    key_state: tauri::State<'_, encryption::EncryptionKey>,
+    plaintext: String,
+) -> Result<String, String> {
+    encryption::encrypt(&key_state.0, &plaintext)
+}
+
+#[tauri::command]
+fn decrypt_password(
+    key_state: tauri::State<'_, encryption::EncryptionKey>,
+    ciphertext: String,
+) -> Result<String, String> {
+    encryption::decrypt(&key_state.0, &ciphertext)
 }
 
 #[tauri::command]
@@ -103,6 +122,12 @@ fn run_native_dump(params: DumpParams) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            let key = encryption::init_encryption_key(app.handle())
+                .map_err(|e| Box::<dyn std::error::Error>::from(e))?;
+            app.manage(encryption::EncryptionKey(key));
+            Ok(())
+        })
         .manage(ssh_tunnel::TunnelState(std::sync::Mutex::new(std::collections::HashMap::new())))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_sql::Builder::default().build())
@@ -113,7 +138,9 @@ pub fn run() {
             ssh_tunnel::stop_ssh_tunnel,
             save_file,
             append_text_file,
-            run_native_dump
+            run_native_dump,
+            encrypt_password,
+            decrypt_password
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

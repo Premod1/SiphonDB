@@ -53,6 +53,7 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
   const [sqlQuery, setSqlQuery] = useState("");
   const [queryResult, setQueryResult] = useState<any[] | null>(null);
   const [queryColumns, setQueryColumns] = useState<string[]>([]);
+  const [schemaInfo, setSchemaInfo] = useState<Record<string, string[]>>({});
   
   // Load States
   const [isConnecting, setIsConnecting] = useState(false);
@@ -287,6 +288,7 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
     setColumns([]);
     setQueryResult(null);
     setSelectedRowIndexes(new Set());
+    setSchemaInfo({});
     
     // Close old database first if it exists
     if (dbRef.current) {
@@ -380,6 +382,54 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
         }
       } else {
         setDatabases([dbName]);
+      }
+
+      // 3. Fetch autocomplete schema metadata (tables and columns)
+      try {
+        setStatusMessage("Fetching schema metadata for autocomplete...");
+        let columnsQuery = "";
+        if (connection.db_type === "sqlite") {
+          columnsQuery = `
+            SELECT m.name AS table_name, p.name AS column_name
+            FROM sqlite_schema AS m
+            JOIN pragma_table_info(m.name) AS p
+            WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
+            ORDER BY m.name, p.cid
+          `;
+        } else if (connection.db_type === "postgres") {
+          columnsQuery = `
+            SELECT table_name, column_name 
+            FROM information_schema.columns 
+            WHERE table_schema = 'public'
+            ORDER BY table_name, ordinal_position
+          `;
+        } else {
+          // mysql - cast to CHAR to avoid VARBINARY type errors in SQLx
+          columnsQuery = `
+            SELECT CAST(table_name AS CHAR) AS table_name, CAST(column_name AS CHAR) AS column_name 
+            FROM information_schema.columns 
+            WHERE table_schema = DATABASE()
+            ORDER BY table_name, ordinal_position
+          `;
+        }
+        
+        const colResults = await db.select<{ table_name: string; column_name: string }[]>(columnsQuery);
+        const schema: Record<string, string[]> = {};
+        colResults.forEach(row => {
+          if (!schema[row.table_name]) {
+            schema[row.table_name] = [];
+          }
+          schema[row.table_name].push(row.column_name);
+        });
+        setSchemaInfo(schema);
+      } catch (e) {
+        console.error("Failed to load schema autocomplete data:", e);
+        // Fallback: populate schema with empty arrays for table names we know
+        const schema: Record<string, string[]> = {};
+        tableNames.forEach(t => {
+          schema[t] = [];
+        });
+        setSchemaInfo(schema);
       }
     } catch (err: any) {
       console.error("Connection failed:", err);
@@ -924,6 +974,7 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
               queryResult={queryResult}
               queryColumns={queryColumns}
               handleRunQuery={handleRunQuery}
+              schemaInfo={schemaInfo}
             />
           )}
         </div>

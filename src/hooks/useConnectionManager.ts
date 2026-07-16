@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Database from "@tauri-apps/plugin-sql";
+import { invoke } from "@tauri-apps/api/core";
 
 import { DbConnection } from "../types/connection";
 
@@ -81,14 +82,36 @@ export function useConnectionManager() {
         );
       }
 
-      // Normalize fields
-      const normalized = result.map((conn) => ({
-        ...conn,
-        use_ssh: Number(conn.use_ssh) === 1,
-        ssh_port: conn.ssh_port ? Number(conn.ssh_port) : 22
+      // Normalize fields & decrypt passwords
+      const decrypted = await Promise.all(result.map(async (conn) => {
+        let password = conn.password;
+        let ssh_password = conn.ssh_password;
+        
+        if (password) {
+          try {
+            password = await invoke<string>("decrypt_password", { ciphertext: password });
+          } catch (e) {
+            console.error("Failed to decrypt password:", e);
+          }
+        }
+        if (ssh_password) {
+          try {
+            ssh_password = await invoke<string>("decrypt_password", { ciphertext: ssh_password });
+          } catch (e) {
+            console.error("Failed to decrypt SSH password:", e);
+          }
+        }
+
+        return {
+          ...conn,
+          password,
+          ssh_password,
+          use_ssh: Number(conn.use_ssh) === 1,
+          ssh_port: conn.ssh_port ? Number(conn.ssh_port) : 22
+        };
       }));
 
-      setConnections(normalized);
+      setConnections(decrypted);
     } catch (err: any) {
       console.error("Error fetching connections:", err);
       dbInstance = null;
@@ -103,6 +126,24 @@ export function useConnectionManager() {
     try {
       let db = await getDb();
       
+      let encPassword = profile.password;
+      let encSshPassword = profile.ssh_password;
+      
+      if (encPassword) {
+        try {
+          encPassword = await invoke<string>("encrypt_password", { plaintext: encPassword });
+        } catch (e) {
+          console.error("Failed to encrypt password:", e);
+        }
+      }
+      if (encSshPassword) {
+        try {
+          encSshPassword = await invoke<string>("encrypt_password", { plaintext: encSshPassword });
+        } catch (e) {
+          console.error("Failed to encrypt SSH password:", e);
+        }
+      }
+
       const runQuery = async (activeDb: Database) => {
         if (profile.id) {
           // Update existing connection
@@ -117,13 +158,13 @@ export function useConnectionManager() {
               profile.host || null,
               profile.port ? Number(profile.port) : null,
               profile.username || null,
-              profile.password || null,
+              encPassword || null,
               profile.database_name || null,
               profile.use_ssh ? 1 : 0,
               profile.ssh_host || null,
               profile.ssh_port ? Number(profile.ssh_port) : 22,
               profile.ssh_username || null,
-              profile.ssh_password || null,
+              encSshPassword || null,
               profile.ssh_key_path || null,
               profile.id
             ]
@@ -142,13 +183,13 @@ export function useConnectionManager() {
               profile.host || null,
               profile.port ? Number(profile.port) : null,
               profile.username || null,
-              profile.password || null,
+              encPassword || null,
               profile.database_name || null,
               profile.use_ssh ? 1 : 0,
               profile.ssh_host || null,
               profile.ssh_port ? Number(profile.ssh_port) : 22,
               profile.ssh_username || null,
-              profile.ssh_password || null,
+              encSshPassword || null,
               profile.ssh_key_path || null
             ]
           );
