@@ -9,6 +9,7 @@ import SqlEditorTab from "./SqlEditorTab";
 import RowEditorModal from "./RowEditorModal";
 import ExportModal from "./ExportModal";
 import { ShieldCheck, ChevronLeft, ChevronRight, AlertCircle, RefreshCw } from "lucide-react";
+import { useQueryManager } from "../../hooks/useQueryManager";
 
 interface DbExplorerProps {
   connection: DbConnection;
@@ -62,6 +63,16 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
   const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [queryError, setQueryError] = useState<string | null>(null);
+  // Query Manager for history and saved templates
+  const {
+    history,
+    savedQueries,
+    addHistoryItem,
+    deleteHistoryItem,
+    clearHistory,
+    saveQueryItem,
+    deleteSavedQueryItem,
+  } = useQueryManager(connection.id, activeDbName);
 
   // Self-healing database connection manager
   const getOrLoadDb = useCallback(async (forceRefresh = false): Promise<Database> => {
@@ -843,10 +854,12 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
 
       try {
         await runQuery(db);
+        await addHistoryItem(sqlQuery);
       } catch (err) {
         console.warn("Retrying user query due to error:", err);
         db = await getOrLoadDb(true);
         await runQuery(db);
+        await addHistoryItem(sqlQuery);
       }
     } catch (err: any) {
       console.error("Query execution failed:", err);
@@ -975,6 +988,12 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
               queryColumns={queryColumns}
               handleRunQuery={handleRunQuery}
               schemaInfo={schemaInfo}
+              history={history}
+              savedQueries={savedQueries}
+              deleteHistoryItem={deleteHistoryItem}
+              clearHistory={clearHistory}
+              saveQueryItem={saveQueryItem}
+              deleteSavedQueryItem={deleteSavedQueryItem}
             />
           )}
         </div>
