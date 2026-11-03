@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Ask a Question or Discuss
+    url: https://github.com/Premod1/SiphonDB/issues
+    about: Ask questions or discuss design ideas with the community.
+  - name: 📖 Contributing Guide
+    url: https://github.com/Premod1/SiphonDB/blob/main/CONTRIBUTING.md
+    about: Please read our contributing guide before opening a PR or complex issue.

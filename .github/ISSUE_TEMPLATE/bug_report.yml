@@ -1,0 +1,85 @@
+name: 🐛 Bug Report
+description: File a bug report to help us improve SiphonDB
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue! Please provide as much detail as possible so we can reproduce and fix it quickly.
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: When I click on..., the app freezes or shows...
+    validations:
+      required: true
+  - type: dropdown
+    id: db_engine
+    attributes:
+      label: Database Engine
+      description: Which database engine were you connecting to?
+      options:
+        - PostgreSQL
+        - MySQL / MariaDB
+        - SQLite
+        - Multiple / Not Applicable
+    validations:
+      required: true
+  - type: dropdown
+    id: connection_mode
+    attributes:
+      label: Connection Mode
+      description: Were you connecting directly or via SSH Tunnel?
+      options:
+        - Direct Connection
+        - SSH Tunnel (Password Auth)
+        - SSH Tunnel (Keyfile Auth)
+        - Not Applicable
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can someone reproduce this behavior?
+      placeholder: |
+        1. Open connection to PostgreSQL
+        2. Navigate to table 'users'
+        3. Double click on row 2 to edit
+        4. See error...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen instead?
+      placeholder: The row should update successfully without error.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating System & Version
+      description: E.g., Ubuntu 24.04, macOS Sonoma 14.5, Windows 11
+      placeholder: Ubuntu 24.04 LTS
+    validations:
+      required: true
+  - type: input
+    id: app_version
+    attributes:
+      label: SiphonDB Version
+      description: App version or git commit hash (e.g. v0.1.1 or main branch commit)
+      placeholder: v0.1.1
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs or Screenshots
+      description: Paste any console errors, terminal logs, or drag & drop screenshots.
+      placeholder: Paste console output or error message here...
+    validations:
+      required: false

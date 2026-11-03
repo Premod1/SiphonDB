@@ -1,0 +1,56 @@
+name: 💡 Feature Request
+description: Suggest an idea or enhancement for SiphonDB
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting an idea! We're always looking for ways to make SiphonDB more productive, responsive, and intuitive.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Motivation
+      description: Is your feature request related to a problem or limitation?
+      placeholder: I'm always frustrated when... / I need a way to...
+    validations:
+      required: true
+  - type: textarea
+    id: proposed_solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution or user experience you would like to see.
+      placeholder: Add a button to... / Allow exporting data as Parquet...
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative solutions or features?
+      placeholder: A clear and concise description of any alternative solutions you've considered.
+    validations:
+      required: false
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Feature Scope / Area
+      description: Which part of the application does this feature affect?
+      options:
+        - Data Grid / Table Preview
+        - SQL Editor & Execution
+        - Database Diagram (ERD)
+        - Data Export (SQL, CSV, JSON)
+        - SSH Tunnel & Networking
+        - Connection Manager & Security
+        - UI / Theme / Performance
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Would you be willing to submit a Pull Request to implement this?
+      options:
+        - label: Yes, I am willing to submit a PR!
