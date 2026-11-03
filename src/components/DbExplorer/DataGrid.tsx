@@ -97,7 +97,7 @@ export default function DataGrid({
           {hasActiveFilters && (
             <button
               onClick={handleClearFilters}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-yellow-600/10 hover:bg-yellow-600/20 border border-yellow-500/20 hover:border-yellow-500/40 text-yellow-450 rounded-lg font-semibold transition-all cursor-pointer text-[11px]"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-yellow-600/10 hover:bg-yellow-600/20 border border-yellow-500/20 hover:border-yellow-500/40 text-yellow-400 rounded-lg font-semibold transition-all cursor-pointer text-[11px]"
             >
               Clear Filters
             </button>
