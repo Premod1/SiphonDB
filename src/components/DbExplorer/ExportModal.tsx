@@ -3,7 +3,7 @@ import Database from "@tauri-apps/plugin-sql";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { DbConnection } from "../../types/connection";
-import { quote } from "../../utils/db";
+import { quote, resolveNativeDumpDatabaseName } from "../../utils/db";
 import { X, Download, AlertCircle, CheckCircle2, RefreshCw, FileText, Database as DbIcon, ShieldCheck } from "lucide-react";
 
 interface ExportModalProps {
@@ -208,7 +208,7 @@ export default function ExportModal({
             port: port,
             username: connection.username,
             password: connection.password,
-            database_name: connection.database_name || activeDbName,
+            database_name: resolveNativeDumpDatabaseName(activeDbName, connection.database_name),
             target_path: filePathOrDir,
           }
         });

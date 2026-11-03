@@ -1,5 +1,7 @@
 import { DbConnection } from "../types/connection";
 
+export { resolveNativeDumpDatabaseName } from "./resolveNativeDumpDatabaseName";
+
 export const getConnectionUri = (conn: DbConnection, dbName: string, localSshPort: number | null): string => {
   if (conn.db_type === "sqlite") {
     return `sqlite:${conn.database_name}`;
