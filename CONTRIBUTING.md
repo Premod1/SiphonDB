@@ -162,6 +162,8 @@ Write clear, concise commit messages in the present tense:
    ```bash
    git push origin <your-branch-name>
    ```
+   > [!TIP]
+   > If you use HTTPS and encounter a `refusing to allow a Personal Access Token to create or update workflow without workflow scope` error when pushing, ensure your GitHub Personal Access Token has the `workflow` scope enabled (or push via SSH key).
 4. Open a Pull Request against the `main` branch of `Premod1/SiphonDB`.
 5. Fill out the [Pull Request Template](.github/pull_request_template.md). Link related issues (e.g. `Fixes #15`).
 
