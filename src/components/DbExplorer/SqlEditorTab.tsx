@@ -3,6 +3,7 @@ import { Terminal, Play, AlertCircle, Table, History, Bookmark, Trash2, X, Bookm
 import CodeMirror from "@uiw/react-codemirror";
 import { sql } from "@codemirror/lang-sql";
 import { HistoryItem, SavedQueryItem } from "../../hooks/useQueryManager";
+import { parseTimestamp } from "../../utils/time";
 
 interface SqlEditorTabProps {
   sqlQuery: string;
@@ -118,7 +119,7 @@ export default function SqlEditorTab({
                           {item.query_text}
                         </span>
                         <span className="text-[9px] text-gray-500 mt-1 font-mono">
-                          {new Date(item.executed_at).toLocaleTimeString()}
+                          {parseTimestamp(item.executed_at).toLocaleTimeString()}
                         </span>
                         <button
                           onClick={(e) => {
