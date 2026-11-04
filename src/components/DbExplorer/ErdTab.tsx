@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, MouseEvent, WheelEvent } from "react";
+import { useState, useEffect, useRef, MouseEvent } from "react";
 import Database from "@tauri-apps/plugin-sql";
 import { DbConnection } from "../../types/connection";
 import { 
@@ -124,25 +124,35 @@ export default function ErdTab({
       let fksList: { from_table: string; from_column: string; to_table: string; to_column: string }[] = [];
 
       if (connection.db_type === "sqlite") {
-        await Promise.all(
+        // Collect per-table results, then append in tables[] order. Pushing into
+        // shared arrays from Promise.all races and shuffles column order (#29).
+        const sqliteMeta = await Promise.all(
           tables.map(async (table) => {
+            const cols: { table_name: string; name: string; type: string }[] = [];
+            const pks: { table_name: string; name: string }[] = [];
+            const fks: {
+              from_table: string;
+              from_column: string;
+              to_table: string;
+              to_column: string;
+            }[] = [];
             try {
               const colInfo = await activeDb.select<any[]>(`PRAGMA table_info(\`${table}\`)`);
               colInfo.forEach((p) => {
-                colsList.push({
+                cols.push({
                   table_name: table,
                   name: p.name,
                   type: String(p.type).toLowerCase() || "text",
                 });
                 if (p.pk > 0) {
-                  pksList.push({ table_name: table, name: p.name });
+                  pks.push({ table_name: table, name: p.name });
                 }
               });
 
               const fkInfo = await activeDb.select<any[]>(`PRAGMA foreign_key_list(\`${table}\`)`);
               fkInfo.forEach((f) => {
                 if (f.table && f.from && f.to) {
-                  fksList.push({
+                  fks.push({
                     from_table: table,
                     from_column: f.from,
                     to_table: f.table,
@@ -153,8 +163,14 @@ export default function ErdTab({
             } catch (err) {
               console.warn(`Failed to read metadata for table ${table}:`, err);
             }
+            return { cols, pks, fks };
           })
         );
+        for (const meta of sqliteMeta) {
+          colsList.push(...meta.cols);
+          pksList.push(...meta.pks);
+          fksList.push(...meta.fks);
+        }
       } else if (connection.db_type === "postgres") {
         const colsQuery = `
           SELECT table_name, column_name AS name, data_type AS type
@@ -310,18 +326,24 @@ export default function ErdTab({
     };
   }, [activeDragTable, isPanning, zoom, positions]);
 
-  // Handle zooming using wheel
-  const handleWheel = (e: WheelEvent) => {
-    e.preventDefault();
-    const zoomFactor = 1.08;
-    let nextZoom = zoom;
-    if (e.deltaY < 0) {
-      nextZoom = Math.min(2.0, zoom * zoomFactor);
-    } else {
-      nextZoom = Math.max(0.18, zoom / zoomFactor);
-    }
-    setZoom(nextZoom);
-  };
+  // React's onWheel is passive, so preventDefault is ignored there. Attach a
+  // non-passive listener so the canvas can steal the wheel for zoom (#29).
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const handleWheel = (e: globalThis.WheelEvent) => {
+      e.preventDefault();
+      const zoomFactor = 1.08;
+      setZoom((prev) => {
+        if (e.deltaY < 0) {
+          return Math.min(2.0, prev * zoomFactor);
+        }
+        return Math.max(0.18, prev / zoomFactor);
+      });
+    };
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, []);
 
   // Canvas pan triggers
   const handleCanvasMouseDown = (e: MouseEvent) => {
@@ -440,7 +462,6 @@ export default function ErdTab({
         ref={canvasRef}
         className="flex-1 relative overflow-hidden select-none cursor-grab active:cursor-grabbing outline-none"
         onMouseDown={handleCanvasMouseDown}
-        onWheel={handleWheel}
         style={{
           backgroundColor: "#090b11",
           backgroundImage: "radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 0)",

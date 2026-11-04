@@ -884,16 +884,16 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
 
   // Create database handler
   const handleCreateDatabase = async () => {
+    // Prompt before the connecting overlay so the dialog isn't covered (#29).
+    const newDbName = prompt("Enter name for the new database:");
+    if (!newDbName || !newDbName.trim()) {
+      return;
+    }
+
     setIsConnecting(true);
     setStatusMessage("Creating database...");
     setError(null);
     try {
-      const newDbName = prompt("Enter name for the new database:");
-      if (!newDbName || !newDbName.trim()) {
-        setIsConnecting(false);
-        return;
-      }
-
       let db = await getOrLoadDb();
       
       const runCreate = async (activeDbInstance: Database) => {
