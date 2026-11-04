@@ -5,6 +5,35 @@ export const quote = (name: string, dbType: string): string => {
   return `\`${name.replace(/`/g, "``")}\``;
 };
 
+export const getColumnCastType = (dbType: string): string => {
+  // In PostgreSQL, CHAR means char(1) which truncates numbers/strings to 1 char.
+  // Use TEXT for PostgreSQL (#15).
+  return dbType === "postgres" ? "TEXT" : "CHAR";
+};
+
+export const buildColumnProjection = (
+  colName: string,
+  colType: string,
+  dbType: string
+): string => {
+  const type = colType.toLowerCase();
+  const needsCast =
+    type.includes("decimal") ||
+    type.includes("numeric") ||
+    type.includes("binary") ||
+    type.includes("bytea") ||
+    type.includes("blob") ||
+    type.includes("bit") ||
+    type.includes("geometry");
+
+  const quotedCol = quote(colName, dbType);
+  if (needsCast) {
+    const castType = getColumnCastType(dbType);
+    return `CAST(${quotedCol} AS ${castType}) AS ${quotedCol}`;
+  }
+  return quotedCol;
+};
+
 export const buildDeleteRowQuery = (
   tableName: string,
   dbType: string,

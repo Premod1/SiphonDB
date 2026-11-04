@@ -1,7 +1,13 @@
 import { DbConnection } from "../types/connection";
 
 export { resolveNativeDumpDatabaseName } from "./resolveNativeDumpDatabaseName";
-export { quote, buildDeleteRowQuery, buildUpdateRowQuery } from "./rowOperations";
+export {
+  quote,
+  buildDeleteRowQuery,
+  buildUpdateRowQuery,
+  buildColumnProjection,
+  getColumnCastType,
+} from "./rowOperations";
 
 export const getConnectionUri = (conn: DbConnection, dbName: string, localSshPort: number | null): string => {
   if (conn.db_type === "sqlite") {

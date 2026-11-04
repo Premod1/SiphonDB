@@ -3,7 +3,7 @@ import Database from "@tauri-apps/plugin-sql";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { DbConnection } from "../../types/connection";
-import { quote, resolveNativeDumpDatabaseName } from "../../utils/db";
+import { quote, resolveNativeDumpDatabaseName, buildColumnProjection } from "../../utils/db";
 import { X, Download, AlertCircle, CheckCircle2, RefreshCw, FileText, Database as DbIcon, ShieldCheck } from "lucide-react";
 
 interface ExportModalProps {
@@ -279,20 +279,9 @@ export default function ExportModal({
               const columnNames = colMeta.map(c => c.name);
               
               // Build projection string
-              const projections = colMeta.map(col => {
-                const type = col.type;
-                const needsCast = type.includes("decimal") || 
-                                  type.includes("numeric") || 
-                                  type.includes("binary") || 
-                                  type.includes("blob") || 
-                                  type.includes("bit") || 
-                                  type.includes("geometry");
-                
-                if (needsCast) {
-                  return `CAST(${quote(col.name, connection.db_type)} AS CHAR) AS ${quote(col.name, connection.db_type)}`;
-                }
-                return quote(col.name, connection.db_type);
-              });
+              const projections = colMeta.map(col =>
+                buildColumnProjection(col.name, col.type, connection.db_type)
+              );
               const selectFields = projections.length > 0 ? projections.join(", ") : "*";
 
               // Paginate & Insert
@@ -355,19 +344,9 @@ export default function ExportModal({
 
           if (totalRows > 0) {
             // Build projection string
-            const projections = colMeta.map(col => {
-              const type = col.type;
-              const needsCast = type.includes("decimal") || 
-                                type.includes("numeric") || 
-                                type.includes("binary") || 
-                                type.includes("blob") || 
-                                type.includes("bit") || 
-                                type.includes("geometry");
-              if (needsCast) {
-                return `CAST(${quote(col.name, connection.db_type)} AS CHAR) AS ${quote(col.name, connection.db_type)}`;
-              }
-              return quote(col.name, connection.db_type);
-            });
+            const projections = colMeta.map(col =>
+              buildColumnProjection(col.name, col.type, connection.db_type)
+            );
             const selectFields = projections.length > 0 ? projections.join(", ") : "*";
 
             let offset = 0;
@@ -420,19 +399,9 @@ export default function ExportModal({
           const totalRows = Number(countResult[0]?.count || 0);
 
           if (totalRows > 0) {
-            const projections = colMeta.map(col => {
-              const type = col.type;
-              const needsCast = type.includes("decimal") || 
-                                type.includes("numeric") || 
-                                type.includes("binary") || 
-                                type.includes("blob") || 
-                                type.includes("bit") || 
-                                type.includes("geometry");
-              if (needsCast) {
-                return `CAST(${quote(col.name, connection.db_type)} AS CHAR) AS ${quote(col.name, connection.db_type)}`;
-              }
-              return quote(col.name, connection.db_type);
-            });
+            const projections = colMeta.map(col =>
+              buildColumnProjection(col.name, col.type, connection.db_type)
+            );
             const selectFields = projections.length > 0 ? projections.join(", ") : "*";
 
             let offset = 0;

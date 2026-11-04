@@ -2,7 +2,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Database from "@tauri-apps/plugin-sql";
 import { invoke } from "@tauri-apps/api/core";
 import { DbConnection } from "../../types/connection";
-import { getConnectionUri, quote, buildDeleteRowQuery, buildUpdateRowQuery } from "../../utils/db";
+import {
+  getConnectionUri,
+  quote,
+  buildDeleteRowQuery,
+  buildUpdateRowQuery,
+  buildColumnProjection,
+} from "../../utils/db";
 import TableSidebar from "./TableSidebar";
 import DataGrid from "./DataGrid";
 import SqlEditorTab from "./SqlEditorTab";
@@ -299,20 +305,9 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
         setColumns(columnNamesList);
 
         // Build the select projections
-        const projections = colMeta.map(col => {
-          const type = col.type;
-          const needsCast = type.includes("decimal") || 
-                            type.includes("numeric") || 
-                            type.includes("binary") || 
-                            type.includes("blob") || 
-                            type.includes("bit") || 
-                            type.includes("geometry");
-          
-          if (needsCast) {
-            return `CAST(${quote(col.name, connection.db_type)} AS CHAR) AS ${quote(col.name, connection.db_type)}`;
-          }
-          return quote(col.name, connection.db_type);
-        });
+        const projections = colMeta.map(col =>
+          buildColumnProjection(col.name, col.type, connection.db_type)
+        );
 
         const selectFields = projections.length > 0 ? projections.join(", ") : "*";
 

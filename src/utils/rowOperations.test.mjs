@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { quote, buildDeleteRowQuery, buildUpdateRowQuery } from "./rowOperations.ts";
+import {
+  quote,
+  buildDeleteRowQuery,
+  buildUpdateRowQuery,
+  buildColumnProjection,
+  getColumnCastType,
+} from "./rowOperations.ts";
 
 test("quote properly escapes identifiers for PostgreSQL, MySQL, and SQLite", () => {
   assert.equal(quote("Users", "postgres"), '"Users"');
@@ -119,3 +125,40 @@ test("buildUpdateRowQuery limits to 1 row when table has no primary key (#18)", 
     "UPDATE `users` SET `name` = ? WHERE rowid = (SELECT rowid FROM `users` WHERE `name` = ? AND `email` = ? LIMIT 1)"
   );
 });
+
+test("getColumnCastType returns TEXT for Postgres and CHAR for MySQL/SQLite (#15)", () => {
+  assert.equal(getColumnCastType("postgres"), "TEXT");
+  assert.equal(getColumnCastType("mysql"), "CHAR");
+  assert.equal(getColumnCastType("sqlite"), "CHAR");
+});
+
+test("buildColumnProjection casts numeric/decimal/bytea as TEXT in PostgreSQL to avoid 1-char truncation (#15)", () => {
+  assert.equal(
+    buildColumnProjection("amount", "numeric", "postgres"),
+    'CAST("amount" AS TEXT) AS "amount"'
+  );
+  assert.equal(
+    buildColumnProjection("price", "decimal(10,2)", "postgres"),
+    'CAST("price" AS TEXT) AS "price"'
+  );
+  assert.equal(
+    buildColumnProjection("data", "bytea", "postgres"),
+    'CAST("data" AS TEXT) AS "data"'
+  );
+  // Unaffected columns should not be cast
+  assert.equal(buildColumnProjection("id", "integer", "postgres"), '"id"');
+  assert.equal(buildColumnProjection("name", "varchar", "postgres"), '"name"');
+});
+
+test("buildColumnProjection casts decimal/blob/geometry as CHAR in MySQL and SQLite", () => {
+  assert.equal(
+    buildColumnProjection("amount", "decimal(10,2)", "mysql"),
+    "CAST(`amount` AS CHAR) AS `amount`"
+  );
+  assert.equal(
+    buildColumnProjection("data", "blob", "sqlite"),
+    "CAST(`data` AS CHAR) AS `data`"
+  );
+  assert.equal(buildColumnProjection("id", "int", "mysql"), "`id`");
+});
+
