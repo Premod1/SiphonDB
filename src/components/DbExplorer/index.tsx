@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Database from "@tauri-apps/plugin-sql";
 import { invoke } from "@tauri-apps/api/core";
 import { DbConnection } from "../../types/connection";
-import { getConnectionUri, quote } from "../../utils/db";
+import { getConnectionUri, quote, buildDeleteRowQuery, buildUpdateRowQuery } from "../../utils/db";
 import TableSidebar from "./TableSidebar";
 import DataGrid from "./DataGrid";
 import SqlEditorTab from "./SqlEditorTab";
@@ -154,14 +154,35 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
         const pragma = await db.select<any[]>(`PRAGMA table_info(\`${tableName}\`)`);
         return pragma.filter(col => col.pk > 0).map(col => col.name);
       } else if (connection.db_type === "postgres") {
-        const queryStr = `
+        // Query information_schema matching exact table name (preserves mixed-case names like "Users")
+        const infoSchemaQuery = `
+          SELECT kcu.column_name AS name
+          FROM information_schema.table_constraints tc
+          JOIN information_schema.key_column_usage kcu
+            ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_schema = kcu.table_schema
+            AND tc.table_name = kcu.table_name
+          WHERE tc.constraint_type = 'PRIMARY KEY'
+            AND tc.table_name = $1
+            AND (tc.table_schema = 'public' OR tc.table_schema = CURRENT_SCHEMA())
+          ORDER BY kcu.ordinal_position
+        `;
+        const results = await db.select<{ name: string }[]>(infoSchemaQuery, [tableName]);
+        if (results.length > 0) {
+          return results.map(r => r.name);
+        }
+
+        // Fallback: pg_index using quoted identifier with to_regclass to avoid unquoted lower-casing (#18)
+        const quotedTable = quote(tableName, "postgres");
+        const fallbackQuery = `
           SELECT a.attname AS name
           FROM pg_index i
           JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-          WHERE i.indrelid = $1::regclass AND i.indisprimary
+          WHERE i.indrelid = to_regclass($1) AND i.indisprimary
+          ORDER BY array_position(i.indkey, a.attnum)
         `;
-        const results = await db.select<{ name: string }[]>(queryStr, [tableName]);
-        return results.map(r => r.name);
+        const fallbackResults = await db.select<{ name: string }[]>(fallbackQuery, [quotedTable]);
+        return fallbackResults.map(r => r.name);
       } else {
         // mysql
         const queryStr = `
@@ -715,7 +736,12 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
   const handleDeleteRow = async () => {
     if (!selectedTable || selectedRowIndexes.size === 0) return;
 
-    if (!confirm(`Are you sure you want to delete the ${selectedRowIndexes.size} selected row(s)?`)) return;
+    const hasPk = primaryKeys.length > 0;
+    const confirmMessage = hasPk
+      ? `Are you sure you want to delete the ${selectedRowIndexes.size} selected row(s)?`
+      : `Warning: Table "${selectedTable}" has no primary key. Each deletion will match all column values and limit to 1 row.\n\nAre you sure you want to delete the ${selectedRowIndexes.size} selected row(s)?`;
+
+    if (!confirm(confirmMessage)) return;
 
     setIsDataLoading(true);
     setError(null);
@@ -744,7 +770,12 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
             }
           });
 
-          const deleteQuery = `DELETE FROM ${quote(selectedTable, connection.db_type)} WHERE ${conditions.join(" AND ")}`;
+          const deleteQuery = buildDeleteRowQuery(
+            selectedTable,
+            connection.db_type,
+            conditions,
+            hasPk
+          );
           await activeDbInstance.execute(deleteQuery, params);
         }
       };
@@ -856,7 +887,13 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
             }
           });
 
-          const updateQuery = `UPDATE ${quote(selectedTable, connection.db_type)} SET ${setStatements.join(", ")} WHERE ${whereConditionsList.join(" AND ")}`;
+          const updateQuery = buildUpdateRowQuery(
+            selectedTable,
+            connection.db_type,
+            setStatements,
+            whereConditionsList,
+            primaryKeys.length > 0
+          );
           const finalParams = [...updateParams, ...whereParamsList];
           
           await activeDbInstance.execute(updateQuery, finalParams);
