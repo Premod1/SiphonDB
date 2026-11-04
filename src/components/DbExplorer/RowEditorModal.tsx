@@ -1,4 +1,4 @@
-import { Key } from "lucide-react";
+import { Key, AlertTriangle } from "lucide-react";
 
 interface RowEditorModalProps {
   isOpen: boolean;
@@ -53,6 +53,12 @@ export default function RowEditorModal({
 
         {/* Scrollable Form */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {rowEditorMode === "edit" && primaryKeys.length === 0 && (
+            <div className="flex items-center gap-2 p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-xs">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>This table has no primary key. Changes will match all column values to update a single row.</span>
+            </div>
+          )}
           {columns.map((col) => {
             const isPk = primaryKeys.includes(col);
             const isNull = rowEditorNulls[col];

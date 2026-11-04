@@ -1,6 +1,7 @@
 import { DbConnection } from "../types/connection";
 
 export { resolveNativeDumpDatabaseName } from "./resolveNativeDumpDatabaseName";
+export { quote, buildDeleteRowQuery, buildUpdateRowQuery } from "./rowOperations";
 
 export const getConnectionUri = (conn: DbConnection, dbName: string, localSshPort: number | null): string => {
   if (conn.db_type === "sqlite") {
@@ -11,8 +12,4 @@ export const getConnectionUri = (conn: DbConnection, dbName: string, localSshPor
   const user = encodeURIComponent(conn.username || "");
   const pass = encodeURIComponent(conn.password || "");
   return `${conn.db_type}://${user}:${pass}@${host}:${port}/${dbName}?connect_timeout=5`;
-};
-
-export const quote = (name: string, dbType: string): string => {
-  return dbType === "postgres" ? `"${name}"` : `\`${name}\``;
 };

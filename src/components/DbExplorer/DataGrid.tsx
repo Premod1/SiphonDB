@@ -105,6 +105,14 @@ export default function DataGrid({
         </div>
 
         <div className="flex items-center gap-2">
+          {selectedTable && primaryKeys.length === 0 && (
+            <span
+              className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded font-medium"
+              title="This table has no primary key. Updates and deletes will match all columns and limit to 1 row."
+            >
+              No PK
+            </span>
+          )}
           <span className="text-gray-500">
             Previewing: <span className="font-semibold text-white">{selectedTable || "None"}</span>
           </span>
