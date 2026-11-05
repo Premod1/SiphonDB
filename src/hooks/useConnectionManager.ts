@@ -3,6 +3,7 @@ import Database from "@tauri-apps/plugin-sql";
 import { invoke } from "@tauri-apps/api/core";
 
 import { DbConnection } from "../types/connection";
+import { isConnectionError } from "../utils/db";
 
 let dbInstance: Database | null = null;
 
@@ -75,11 +76,15 @@ export function useConnectionManager() {
           "SELECT * FROM db_connections ORDER BY id DESC"
         );
       } catch (err) {
-        console.warn("Retrying fetchConnections due to query error:", err);
-        db = await getDb(true);
-        result = await db.select<any[]>(
-          "SELECT * FROM db_connections ORDER BY id DESC"
-        );
+        if (isConnectionError(err)) {
+          console.warn("Retrying fetchConnections due to connection error:", err);
+          db = await getDb(true);
+          result = await db.select<any[]>(
+            "SELECT * FROM db_connections ORDER BY id DESC"
+          );
+        } else {
+          throw err;
+        }
       }
 
       // Normalize fields & decrypt passwords
@@ -199,9 +204,13 @@ export function useConnectionManager() {
       try {
         await runQuery(db);
       } catch (err) {
-        console.warn("Retrying saveConnection due to query error:", err);
-        db = await getDb(true);
-        await runQuery(db);
+        if (isConnectionError(err)) {
+          console.warn("Retrying saveConnection due to connection error:", err);
+          db = await getDb(true);
+          await runQuery(db);
+        } else {
+          throw err;
+        }
       }
       
       await fetchConnections();
@@ -221,9 +230,13 @@ export function useConnectionManager() {
       try {
         await db.execute("DELETE FROM db_connections WHERE id = ?", [id]);
       } catch (err) {
-        console.warn("Retrying deleteConnection due to query error:", err);
-        db = await getDb(true);
-        await db.execute("DELETE FROM db_connections WHERE id = ?", [id]);
+        if (isConnectionError(err)) {
+          console.warn("Retrying deleteConnection due to connection error:", err);
+          db = await getDb(true);
+          await db.execute("DELETE FROM db_connections WHERE id = ?", [id]);
+        } else {
+          throw err;
+        }
       }
       await fetchConnections();
       return true;
