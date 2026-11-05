@@ -5,7 +5,9 @@
 const COMMANDS: &[&str] = &["load", "execute", "select", "close"];
 
 fn main() {
-    tauri_plugin::Builder::new(COMMANDS)
-        .global_api_script_path("./api-iife.js")
-        .build();
+    let mut builder = tauri_plugin::Builder::new(COMMANDS);
+    if std::path::Path::new("./api-iife.js").exists() {
+        builder = builder.global_api_script_path("./api-iife.js");
+    }
+    builder.build();
 }
