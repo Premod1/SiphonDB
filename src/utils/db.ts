@@ -8,6 +8,12 @@ export {
   buildColumnProjection,
   getColumnCastType,
 } from "./rowOperations";
+export {
+  isConnectionError,
+  isSelectQuery,
+  hasMultipleStatements,
+  stripLeadingComments,
+} from "./queryRetry";
 
 export const getConnectionUri = (conn: DbConnection, dbName: string, localSshPort: number | null): string => {
   if (conn.db_type === "sqlite") {

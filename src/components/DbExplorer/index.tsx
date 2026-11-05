@@ -8,6 +8,8 @@ import {
   buildDeleteRowQuery,
   buildUpdateRowQuery,
   buildColumnProjection,
+  isConnectionError,
+  isSelectQuery,
 } from "../../utils/db";
 import TableSidebar from "./TableSidebar";
 import DataGrid from "./DataGrid";
@@ -327,9 +329,13 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
       try {
         await runFetch(db);
       } catch (err) {
-        console.warn("Retrying fetchTableData due to query error:", err);
-        db = await getOrLoadDb(true); // Force reload connection pool
-        await runFetch(db);
+        if (isConnectionError(err)) {
+          console.warn("Retrying fetchTableData due to connection error:", err);
+          db = await getOrLoadDb(true); // Force reload connection pool
+          await runFetch(db);
+        } else {
+          throw err;
+        }
       }
     } catch (err: any) {
       console.error("Failed to load table data:", err);
@@ -778,9 +784,13 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
       try {
         await runDelete(db);
       } catch (err) {
-        console.warn("Retrying delete operation due to error:", err);
-        db = await getOrLoadDb(true);
-        await runDelete(db);
+        if (isConnectionError(err)) {
+          console.warn("Retrying delete operation due to connection error:", err);
+          db = await getOrLoadDb(true);
+          await runDelete(db);
+        } else {
+          throw err;
+        }
       }
 
       setSelectedRowIndexes(new Set());
@@ -898,9 +908,13 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
       try {
         await runSave(db);
       } catch (err) {
-        console.warn("Retrying save operation due to error:", err);
-        db = await getOrLoadDb(true);
-        await runSave(db);
+        if (isConnectionError(err)) {
+          console.warn("Retrying save operation due to connection error:", err);
+          db = await getOrLoadDb(true);
+          await runSave(db);
+        } else {
+          throw err;
+        }
       }
 
       setIsRowEditorOpen(false);
@@ -943,9 +957,13 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
       try {
         await runCreate(db);
       } catch (err) {
-        console.warn("Retrying database creation due to error:", err);
-        db = await getOrLoadDb(true);
-        await runCreate(db);
+        if (isConnectionError(err)) {
+          console.warn("Retrying database creation due to connection error:", err);
+          db = await getOrLoadDb(true);
+          await runCreate(db);
+        } else {
+          throw err;
+        }
       }
 
       await connectToDatabase(newDbName);
@@ -967,12 +985,9 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
 
     try {
       let db = await getOrLoadDb();
+      const isSelect = isSelectQuery(sqlQuery);
       
       const runQuery = async (activeDbInstance: Database) => {
-        const isSelect = sqlQuery.trim().toLowerCase().startsWith("select") || 
-                         sqlQuery.trim().toLowerCase().startsWith("pragma") || 
-                         sqlQuery.trim().toLowerCase().startsWith("show");
-
         if (isSelect) {
           const results = await activeDbInstance.select<any[]>(sqlQuery);
           setQueryResult(results);
@@ -994,10 +1009,14 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
         await runQuery(db);
         await addHistoryItem(sqlQuery);
       } catch (err) {
-        console.warn("Retrying user query due to error:", err);
-        db = await getOrLoadDb(true);
-        await runQuery(db);
-        await addHistoryItem(sqlQuery);
+        if (isSelect && isConnectionError(err)) {
+          console.warn("Retrying user query due to connection error:", err);
+          db = await getOrLoadDb(true);
+          await runQuery(db);
+          await addHistoryItem(sqlQuery);
+        } else {
+          throw err;
+        }
       }
     } catch (err: any) {
       console.error("Query execution failed:", err);
