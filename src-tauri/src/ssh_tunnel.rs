@@ -119,7 +119,7 @@ fn handle_single_connection(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn start_ssh_tunnel(
     state: tauri::State<'_, TunnelState>,
     id: u32,
@@ -243,7 +243,7 @@ pub fn start_ssh_tunnel(
     Ok(local_port)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stop_ssh_tunnel(
     state: tauri::State<'_, TunnelState>,
     id: u32,

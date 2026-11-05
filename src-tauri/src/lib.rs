@@ -9,7 +9,7 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn encrypt_password(
     key_state: tauri::State<'_, encryption::EncryptionKey>,
     plaintext: String,
@@ -17,7 +17,7 @@ fn encrypt_password(
     encryption::encrypt(&key_state.0, &plaintext)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn decrypt_password(
     key_state: tauri::State<'_, encryption::EncryptionKey>,
     ciphertext: String,
@@ -25,12 +25,12 @@ fn decrypt_password(
     encryption::decrypt(&key_state.0, &ciphertext)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn save_file(path: String, contents: String) -> Result<(), String> {
     std::fs::write(&path, contents).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn append_text_file(path: String, content: String) -> Result<(), String> {
     use std::fs::OpenOptions;
     use std::io::Write;
@@ -54,7 +54,7 @@ struct DumpParams {
     target_path: String,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn run_native_dump(params: DumpParams) -> Result<(), String> {
     use std::process::Command;
     
