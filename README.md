@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="app-icon.png" alt="SiphonDB Logo" width="128" height="128" />
+
 # SiphonDB 🌀
 
 **A blazingly fast, modern desktop database client & schema explorer built with Tauri v2, React 19, and Rust.**

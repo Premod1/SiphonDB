@@ -62,6 +62,6 @@ jobs:
           tagName: v__VERSION__ # tauri-action replaces __VERSION__ with the app version from tauri.conf.json
           releaseName: 'SiphonDB v__VERSION__'
           releaseBody: 'See the assets below to download and install SiphonDB.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
