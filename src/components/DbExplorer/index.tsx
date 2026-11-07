@@ -369,9 +369,10 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
     }
 
     // Stop old SSH tunnel if any
-    if (sshLocalPortRef.current && connection.id) {
+    if (sshLocalPortRef.current) {
+      const tunnelId = connection.id || 9999;
       try {
-        await invoke("stop_ssh_tunnel", { id: connection.id });
+        await invoke("stop_ssh_tunnel", { id: tunnelId });
       } catch (e) {
         console.error("Error stopping old SSH tunnel:", e);
       }
@@ -540,8 +541,9 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
         dbRef.current.close(dbRef.current.path).catch(console.error);
         dbRef.current = null;
       }
-      if (sshLocalPortRef.current && connection.id) {
-        invoke("stop_ssh_tunnel", { id: connection.id }).catch(console.error);
+      if (sshLocalPortRef.current) {
+        const tunnelId = connection.id || 9999;
+        invoke("stop_ssh_tunnel", { id: tunnelId }).catch(console.error);
         sshLocalPortRef.current = null;
       }
     };
