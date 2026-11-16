@@ -19,6 +19,9 @@ import RowEditorModal from "./RowEditorModal";
 import ExportModal from "./ExportModal";
 import { ShieldCheck, ChevronLeft, ChevronRight, AlertCircle, RefreshCw } from "lucide-react";
 import { useQueryManager } from "../../hooks/useQueryManager";
+import { createDebouncer, createLatestRequestTracker } from "../../utils/async";
+
+const FILTER_DEBOUNCE_MS = 300;
 
 interface DbExplorerProps {
   connection: DbConnection;
@@ -28,6 +31,8 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
   const [activeDb, setActiveDb] = useState<Database | null>(null);
   const dbRef = useRef<Database | null>(null);
   const sshLocalPortRef = useRef<number | null>(null);
+  const fetchRequestTrackerRef = useRef(createLatestRequestTracker());
+  const filterDebouncerRef = useRef(createDebouncer(FILTER_DEBOUNCE_MS));
   
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
@@ -257,10 +262,12 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
     overrideSortCol?: string | null,
     overrideSortDir?: "ASC" | "DESC" | null
   ) => {
+    const guard = fetchRequestTrackerRef.current.next();
     setIsDataLoading(true);
     setError(null);
     try {
       let db = await getOrLoadDb();
+      if (guard.isStale()) return;
 
       const filters = overrideFilters !== undefined ? overrideFilters : columnFilters;
       const sortCol = overrideSortCol !== undefined ? overrideSortCol : sortColumn;
@@ -294,15 +301,18 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
           countQuery = `SELECT COUNT(*) AS count FROM \`${tableName}\`${whereString}`;
         }
         const countResult = await activeDbInstance.select<{ count: any }[]>(countQuery);
+        if (guard.isStale()) return;
         const total = Number(countResult[0]?.count || 0);
         setTotalRows(total);
 
         // 2. Fetch PK metadata
         const pks = await fetchPrimaryKeys(tableName, activeDbInstance);
+        if (guard.isStale()) return;
         setPrimaryKeys(pks);
 
         // 3. Fetch column metadata for cast conversions
         const colMeta = await fetchColumnMetadata(tableName, activeDbInstance);
+        if (guard.isStale()) return;
         const columnNamesList = colMeta.map(c => c.name);
         setColumns(columnNamesList);
 
@@ -322,6 +332,7 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
           dataQuery = `SELECT ${selectFields} FROM \`${tableName}\`${whereString}${orderString} LIMIT ${pageSize} OFFSET ${offset}`;
         }
         const data = await activeDbInstance.select<any[]>(dataQuery);
+        if (guard.isStale()) return;
         setRows(data);
         setPage(targetPage);
       };
@@ -329,25 +340,32 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
       try {
         await runFetch(db);
       } catch (err) {
+        if (guard.isStale()) return;
         if (isConnectionError(err)) {
           console.warn("Retrying fetchTableData due to connection error:", err);
           db = await getOrLoadDb(true); // Force reload connection pool
+          if (guard.isStale()) return;
           await runFetch(db);
         } else {
           throw err;
         }
       }
     } catch (err: any) {
+      if (guard.isStale()) return;
       console.error("Failed to load table data:", err);
       const errMsg = err?.message || String(err) || "Unknown database error";
       setError(`Failed to read data from ${tableName}: ${errMsg}`);
     } finally {
-      setIsDataLoading(false);
+      if (!guard.isStale()) {
+        setIsDataLoading(false);
+      }
     }
   }, [connection.db_type, pageSize, getOrLoadDb, columnFilters, sortColumn, sortDirection]);
 
   // Connect & load databases and tables list
   const connectToDatabase = useCallback(async (targetDbName?: string) => {
+    filterDebouncerRef.current.cancel();
+    fetchRequestTrackerRef.current.invalidate();
     setIsConnecting(true);
     setError(null);
     setSelectedTable(null);
@@ -549,9 +567,18 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
     };
   }, [connection.id, connectToDatabase]);
 
+  // Cancel pending debounced filter fetches and invalidate in-flight requests on unmount
+  useEffect(() => {
+    return () => {
+      filterDebouncerRef.current.cancel();
+      fetchRequestTrackerRef.current.invalidate();
+    };
+  }, []);
+
   // Fetch table data when selected table changes
   useEffect(() => {
     if (selectedTable && activeDb) {
+      filterDebouncerRef.current.cancel();
       setColumnFilters({});
       setSortColumn(null);
       setSortDirection(null);
@@ -572,6 +599,7 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
   const handlePageChange = (targetPage: number) => {
     const maxPage = Math.ceil(totalRows / pageSize) || 1;
     if (targetPage < 1 || targetPage > maxPage) return;
+    filterDebouncerRef.current.cancel();
     setSelectedRowIndexes(new Set());
     fetchTableData(selectedTable!, targetPage);
   };
@@ -597,6 +625,7 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
       }
     }
     
+    filterDebouncerRef.current.cancel();
     setSortColumn(nextDir ? columnName : null);
     setSortDirection(nextDir);
     setPage(1);
@@ -625,18 +654,24 @@ export default function DbExplorer({ connection }: DbExplorerProps) {
     setPage(1);
     setPageInputVal("1");
     setSelectedRowIndexes(new Set());
-    
-    fetchTableData(
-      selectedTable!,
-      1,
-      nextFilters,
-      sortColumn,
-      sortDirection
-    );
+
+    const targetTable = selectedTable;
+    if (!targetTable) return;
+
+    filterDebouncerRef.current.schedule(() => {
+      fetchTableData(
+        targetTable,
+        1,
+        nextFilters,
+        sortColumn,
+        sortDirection
+      );
+    });
   };
 
   // Clear Filters Handler
   const handleClearFilters = () => {
+    filterDebouncerRef.current.cancel();
     setColumnFilters({});
     setPage(1);
     setPageInputVal("1");
